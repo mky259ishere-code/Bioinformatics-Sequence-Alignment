@@ -1,39 +1,35 @@
-"""Utilities for reading FASTA files."""
-
+"""Streaming FASTA parsing with validation."""
 from pathlib import Path
+from typing import Iterator
 
 
-def read_fasta(path: str | Path) -> list[tuple[str, str]]:
-    """Read a FASTA file and return (header, sequence) records."""
-    records: list[tuple[str, str]] = []
-    header: str | None = None
-    sequence_parts: list[str] = []
-
-    for line_number, raw_line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
-        line = raw_line.strip()
+def read_fasta_iter(path: str | Path) -> Iterator[tuple[str, str]]:
+    header = None
+    parts: list[str] = []
+    for line_number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
         if not line:
             continue
         if line.startswith(">"):
             if header is not None:
-                records.append((header, "".join(sequence_parts)))
-            header = line[1:].strip() or f"sequence_{len(records) + 1}"
-            sequence_parts = []
+                yield header, "".join(parts)
+            header, parts = line[1:].strip() or f"sequence_{line_number}", []
         elif header is None:
-            raise ValueError(f"Line {line_number}: sequence data appears before a FASTA header")
+            raise ValueError(f"Line {line_number}: sequence before FASTA header")
         else:
-            sequence_parts.append(line.replace(" ", "").upper())
-
+            parts.append("".join(line.split()).upper())
     if header is not None:
-        records.append((header, "".join(sequence_parts)))
+        yield header, "".join(parts)
 
+
+def read_fasta(path: str | Path) -> list[tuple[str, str]]:
+    records = list(read_fasta_iter(path))
     if not records:
-        raise ValueError("The FASTA file contains no sequences")
-
+        raise ValueError("FASTA file contains no sequences")
     for name, sequence in records:
         if not sequence:
             raise ValueError(f"Sequence '{name}' is empty")
         invalid = set(sequence) - set("ACGTN")
         if invalid:
             raise ValueError(f"Sequence '{name}' contains invalid bases: {sorted(invalid)}")
-
     return records
