@@ -1,4 +1,5 @@
 """Minimal NCBI BLASTN URL API client."""
+import re
 import ssl
 import time
 import urllib.parse
@@ -19,7 +20,6 @@ class BlastHit:
 
 
 def system_ssl_context() -> ssl.SSLContext:
-    """Prefer the Windows/system certificate store when truststore is installed."""
     try:
         import truststore
         return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -31,38 +31,35 @@ class BlastClient:
     URL = "https://blast.ncbi.nlm.nih.gov/Blast.cgi"
 
     def _request(self, params: dict[str, str]) -> str:
-        encoded = urllib.parse.urlencode(params).encode()
         request = urllib.request.Request(
             self.URL,
-            data=encoded,
+            data=urllib.parse.urlencode(params).encode(),
             headers={"User-Agent": "BioinformaticsSequenceAlignment/0.2"},
         )
         try:
-            with urllib.request.urlopen(
-                request, timeout=60, context=system_ssl_context()
-            ) as response:
+            with urllib.request.urlopen(request, timeout=60, context=system_ssl_context()) as response:
                 return response.read().decode("utf-8", errors="replace")
         except ssl.SSLCertVerificationError as error:
             raise RuntimeError(
                 "SSL certificate verification failed. Install truststore with "
-                "'python -m pip install truststore', then try again. "
-                "Do not disable certificate verification."
+                "'python -m pip install truststore'. Do not disable verification."
             ) from error
 
     def submit(self, sequence: str, database: str = "nt", max_hits: int = 20) -> str:
         response = self._request({
-            "CMD": "Put",
-            "PROGRAM": "blastn",
-            "DATABASE": database,
-            "MEGABLAST": "on",
-            "QUERY": f">user_query\n{sequence}",
-            "HITLIST_SIZE": str(max_hits),
-            "FORMAT_TYPE": "XML2",
+            "CMD": "Put", "PROGRAM": "blastn", "DATABASE": database,
+            "MEGABLAST": "on", "QUERY": f">user_query\n{sequence}",
+            "HITLIST_SIZE": str(max_hits), "FORMAT_TYPE": "XML2",
         })
-        rid = next((line.split("=", 1)[1].strip() for line in response.splitlines() if line.startswith(" RID =")), None)
-        if not rid:
-            raise RuntimeError("NCBI did not return a BLAST request ID.")
-        return rid
+        match = re.search(r"\bRID\s*=\s*([A-Za-z0-9_-]+)", response)
+        if match:
+            return match.group(1)
+        error_lines = [line.strip() for line in response.splitlines() if "ERROR" in line.upper() or "MESSAGE" in line.upper()]
+        detail = " ".join(error_lines)[:500]
+        raise RuntimeError(
+            "NCBI did not return a BLAST request ID."
+            + (f" Server response: {detail}" if detail else " The response format was unexpected.")
+        )
 
     def fetch_xml(self, rid: str, timeout: int = 600) -> str:
         started = time.monotonic()
@@ -79,9 +76,7 @@ class BlastClient:
         raise TimeoutError("NCBI BLAST timed out. Try again later.")
 
     def search(self, sequence: str, max_hits: int = 20) -> list[BlastHit]:
-        rid = self.submit(sequence, max_hits=max_hits)
-        xml = self.fetch_xml(rid)
-        root = ET.fromstring(xml)
+        root = ET.fromstring(self.fetch_xml(self.submit(sequence, max_hits=max_hits)))
         hits = []
         for hit in root.findall(".//Hit"):
             accession = hit.findtext("Hit_accession") or hit.findtext("Hit_id") or "unknown"
