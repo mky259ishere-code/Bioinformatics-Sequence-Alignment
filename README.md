@@ -1,37 +1,33 @@
 # Bioinformatics Sequence Alignment
 
-A teaching project for fast DNA similarity search using local NCBI BLAST+.
+A hybrid DNA similarity search project using NCBI BLASTN remotely or BLAST+ locally.
 
-## Usage
+## Fast default mode
 
-Install NCBI BLAST+ for Windows from the official NCBI BLAST downloads page, then ensure `blastn` is on PATH.
+Run:
 
-Create or download a BLAST nucleotide database. A database consists of several files sharing one prefix, such as:
-
-```text
-data/nt.nhr
-data/nt.nin
-data/nt.nsq
+```bash
+python main.py
 ```
 
-Run an interactive search:
+Paste a DNA sequence and press Enter twice. The program submits the query to NCBI and immediately prints a request ID and result link. It does not block while NCBI processes the search.
+
+After the result is ready, retrieve parsed hits with:
+
+```bash
+python main.py --check RID_HERE
+```
+
+The program will ask for the original query length to calculate coverage.
+
+## Local fast mode
+
+With BLAST+ installed and a local database:
 
 ```bash
 python main.py --db data/nt
 ```
 
-Or provide a sequence directly:
+Local mode is recommended for repeated searches. NCBI Datasets can download targeted gene or genome data, which can then be formatted as a local BLAST database.
 
-```bash
-python main.py --db data/nt --sequence ATGCGTACGTTAGCTAGC
-```
-
-The program runs local megablast, then reports ranked matches with accession, identity, query coverage, E-value, and clickable NCBI links. It no longer waits for the public NCBI BLAST queue.
-
-For a small test database, create a FASTA file and format it with:
-
-```bash
-makeblastdb -in data/sample_reference.fasta -dbtype nucl -out data/sample_db -parse_seqids
-```
-
-NCBI BLAST+ downloads: https://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/
+The remote mode uses NCBI's asynchronous BLAST URL API. The local mode avoids the public queue entirely.
