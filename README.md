@@ -1,29 +1,37 @@
 # Bioinformatics Sequence Alignment
 
-A teaching project for DNA similarity search.
+A teaching project for fast DNA similarity search using local NCBI BLAST+.
 
-## Current workflow
+## Usage
 
-Run the program without arguments:
+Install NCBI BLAST+ for Windows from the official NCBI BLAST downloads page, then ensure `blastn` is on PATH.
 
-```bash
-python main.py
+Create or download a BLAST nucleotide database. A database consists of several files sharing one prefix, such as:
+
+```text
+data/nt.nhr
+data/nt.nin
+data/nt.nsq
 ```
 
-Paste a DNA sequence and press Enter twice. The program submits it to NCBI BLASTN and reports ranked possible matches with accession links, identity, query coverage, alignment length, and E-value.
-
-You can also use a command-line sequence:
+Run an interactive search:
 
 ```bash
-python main.py --sequence ATGCGTACGTTAGCTAGC
+python main.py --db data/nt
 ```
 
-Or a one-record FASTA file:
+Or provide a sequence directly:
 
 ```bash
-python main.py --fasta data/sample_query.fasta
+python main.py --db data/nt --sequence ATGCGTACGTTAGCTAGC
 ```
 
-The program uses NCBI's public BLAST URL API. Searches may take time because NCBI processes them remotely. It is intended for individual educational use, not high-volume batch searches. NCBI recommends respecting request limits and identifying automated tools; this version does not ask the user for an email.
+The program runs local megablast, then reports ranked matches with accession, identity, query coverage, E-value, and clickable NCBI links. It no longer waits for the public NCBI BLAST queue.
 
-This project is an educational client and does not replace the official NCBI BLAST website.
+For a small test database, create a FASTA file and format it with:
+
+```bash
+makeblastdb -in data/sample_reference.fasta -dbtype nucl -out data/sample_db -parse_seqids
+```
+
+NCBI BLAST+ downloads: https://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/

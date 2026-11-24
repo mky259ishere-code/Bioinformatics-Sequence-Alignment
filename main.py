@@ -1,9 +1,9 @@
-"""User-friendly NCBI BLASTN sequence search."""
+"""Fast local DNA similarity search using NCBI BLAST+."""
 import argparse
 import sys
 
-from src.blast import BlastClient
 from src.fasta import read_fasta
+from src.local_blast import run_local_blast
 
 
 def clean_sequence(raw: str) -> str:
@@ -16,33 +16,36 @@ def clean_sequence(raw: str) -> str:
     return sequence
 
 
+def get_sequence(args) -> str:
+    if args.sequence:
+        return clean_sequence(args.sequence)
+    if args.fasta:
+        records = read_fasta(args.fasta)
+        if len(records) != 1:
+            raise ValueError("Please provide exactly one query sequence.")
+        return records[0][1]
+    print("Paste a DNA sequence. Press Enter twice when finished:")
+    lines = []
+    while True:
+        line = input()
+        if not line.strip():
+            break
+        lines.append(line)
+    return clean_sequence("".join(lines))
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Find similar DNA sequences in NCBI using BLASTN.")
-    parser.add_argument("--sequence", help="DNA sequence to search")
-    parser.add_argument("--fasta", help="FASTA file containing the query sequence")
+    parser = argparse.ArgumentParser(description="Find similar DNA sequences using local BLASTN.")
+    parser.add_argument("--db", required=True, help="Local BLAST database prefix, e.g. data/nt")
+    parser.add_argument("--sequence")
+    parser.add_argument("--fasta")
     parser.add_argument("--max-hits", type=int, default=20)
+    parser.add_argument("--blastn", default="blastn", help="blastn executable or full path")
     args = parser.parse_args()
-
     try:
-        if args.sequence:
-            sequence = clean_sequence(args.sequence)
-        elif args.fasta:
-            records = read_fasta(args.fasta)
-            if len(records) != 1:
-                raise ValueError("Please provide exactly one query sequence.")
-            sequence = records[0][1]
-        else:
-            print("Paste a DNA sequence. Press Enter twice when finished:")
-            lines = []
-            while True:
-                line = input()
-                if not line.strip():
-                    break
-                lines.append(line)
-            sequence = clean_sequence("".join(lines))
-
-        print(f"Submitting {len(sequence)} bases to NCBI BLASTN...")
-        hits = BlastClient().search(sequence, max_hits=args.max_hits)
+        sequence = get_sequence(args)
+        print(f"Searching local BLAST database with {len(sequence)} bases...")
+        hits = run_local_blast(sequence, args.db, args.max_hits, args.blastn)
         if not hits:
             print("No significant matches were returned.")
             return 0
@@ -56,7 +59,7 @@ def main() -> int:
             print(f"   E-value: {hit.evalue}")
             print(f"   NCBI link: {hit.link}\n")
         return 0
-    except (OSError, ValueError, RuntimeError, TimeoutError) as error:
+    except (OSError, ValueError, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
