@@ -1,4 +1,5 @@
 """Minimal NCBI BLASTN URL API client."""
+import ssl
 import time
 import urllib.parse
 import urllib.request
@@ -17,6 +18,15 @@ class BlastHit:
     link: str
 
 
+def system_ssl_context() -> ssl.SSLContext:
+    """Prefer the Windows/system certificate store when truststore is installed."""
+    try:
+        import truststore
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except ImportError:
+        return ssl.create_default_context()
+
+
 class BlastClient:
     URL = "https://blast.ncbi.nlm.nih.gov/Blast.cgi"
 
@@ -27,8 +37,17 @@ class BlastClient:
             data=encoded,
             headers={"User-Agent": "BioinformaticsSequenceAlignment/0.2"},
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return response.read().decode("utf-8", errors="replace")
+        try:
+            with urllib.request.urlopen(
+                request, timeout=60, context=system_ssl_context()
+            ) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except ssl.SSLCertVerificationError as error:
+            raise RuntimeError(
+                "SSL certificate verification failed. Install truststore with "
+                "'python -m pip install truststore', then try again. "
+                "Do not disable certificate verification."
+            ) from error
 
     def submit(self, sequence: str, database: str = "nt", max_hits: int = 20) -> str:
         response = self._request({
