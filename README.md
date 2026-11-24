@@ -2,28 +2,28 @@
 
 A teaching project for DNA similarity search.
 
-## Features
+## Current workflow
 
-- Reads ordinary multi-record FASTA files.
-- Uses a BLAST-like seed-and-extend workflow: k-mer seeding, seed counting, and Smith-Waterman local extension.
-- Searches NCBI's Nucleotide database through E-utilities (ESearch + EFetch).
-- Ranks hits by local alignment score, identity, and seed support.
-- Uses only Python's standard library.
-
-## Usage
-
-Offline/local search:
+Run the program without arguments:
 
 ```bash
-python main.py --query data/sample_query.fasta --reference data/sample_reference.fasta
+python main.py
 ```
 
-NCBI search:
+Paste a DNA sequence and press Enter twice. The program submits it to NCBI BLASTN and reports ranked possible matches with accession links, identity, query coverage, alignment length, and E-value.
+
+You can also use a command-line sequence:
 
 ```bash
-python main.py --query data/sample_query.fasta --ncbi "BRCA1[Gene] AND Homo sapiens[Organism]" --limit 10 --email your.email@example.com
+python main.py --sequence ATGCGTACGTTAGCTAGC
 ```
 
-Use an NCBI API key with `--api-key` if you need more than the default request rate. Do not commit personal API keys to GitHub.
+Or a one-record FASTA file:
 
-This is an educational BLAST-like implementation, not a replacement for NCBI BLAST. Large-scale searches should use NCBI BLAST or the NCBI Datasets tools.
+```bash
+python main.py --fasta data/sample_query.fasta
+```
+
+The program uses NCBI's public BLAST URL API. Searches may take time because NCBI processes them remotely. It is intended for individual educational use, not high-volume batch searches. NCBI recommends respecting request limits and identifying automated tools; this version does not ask the user for an email.
+
+This project is an educational client and does not replace the official NCBI BLAST website.
